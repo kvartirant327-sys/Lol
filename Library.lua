@@ -5169,10 +5169,10 @@ function Library:ThemeWindow(properties)
         Flag = "ui_text",
         Callback = function(mode)
             -- "crisp" renders ProggyClean at its native pixel size
-            local sizes = mode == "crisp" and { tab = 12, section = 12, text = 12, button = 12, hud = 12 }
-                or { tab = 10, section = 8, text = 9, button = 10, hud = 10 }
+            local crisp = mode == "crisp"
+            local sizes = { tab = 10, section = 8, text = 9, button = 10, hud = 10, watermark = 9 }
             for role, size in sizes do
-                Library:SetText(role, { Size = size })
+                Library:SetText(role, { Size = crisp and 12 or size })
             end
         end,
     })
