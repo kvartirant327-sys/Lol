@@ -1,5 +1,5 @@
 --[[
-    rainworld example — builds the whole interface from the design.
+    rainworld example — builds the whole interface.
     Run it in your executor; RightShift opens and closes the menu.
 ]]
 
@@ -45,12 +45,20 @@ AimAssist:Dropdown({
 AimAssist:Button({
     Name = "button",
     Callback = function()
-        Library:Notify({ "pressed ", { "button" } })
+        Library:Notify({ Title = "aim assist", Text = { "pressed ", { "button" } } })
     end,
 })
 
 local Triggerbot = Aimbot:Section({ Name = "triggerbot", Side = "right" })
 Triggerbot:Toggle({ Name = "toggle", Flag = "trigger_enabled", Default = true })
+-- your character in a viewport: click parts to choose them
+local AimParts = Triggerbot:PartPicker({
+    Name = "parts",
+    Flag = "trigger_parts",
+    Multi = true, -- false: one part at a time
+    Default = { "Head", "Torso" },
+    Height = 180,
+})
 
 -- rage: the rest of the element set
 local Elements = Rage:Section({ Name = "elements", Side = "left" })
@@ -66,6 +74,8 @@ Elements:Dropdown({
 Elements:Textbox({ Name = "text", Flag = "demo_text", Placeholder = "type here" })
 Elements:Label({ Name = "menu bind" }):Keybind({ Name = "example bind", Flag = "demo_bind", Default = Enum.KeyCode.X })
 Elements:Colorpicker({ Name = "colour", Flag = "demo_color", Default = Color3.fromRGB(255, 80, 80), Transparency = 0.25 })
+-- animated colours: "Rainbow" or "Pulse", also selectable inside every colour picker
+Elements:Colorpicker({ Name = "rainbow", Flag = "demo_rainbow", Default = Color3.fromRGB(255, 80, 80), Animation = "Rainbow" })
 Elements:Divider("buttons")
 Elements:Button({ Name = "button" })
 Elements:DoubleButton({ Name = "button" }, { Name = "button" })
@@ -75,16 +85,26 @@ local Lists = Rage:Section({ Name = "list", Side = "right" })
 Lists:List({
     Name = "players",
     Flag = "demo_player",
-    Height = 120,
+    Height = "fill", -- stretches with the window
     Options = { "nova", "wraith", "silhouette", "kestrel", "ember", "vellum", "harrow" },
     Save = false,
 })
+Lists:PartPicker({ Name = "target part", Flag = "demo_part", Multi = false, Default = "Head", Height = 150 })
 
--- esp / visuals: plain toggles with colours, as a script would use them
+-- esp: these toggles drive the esp preview further down
+local EspElements = {
+    { "box", Color3.fromRGB(255, 255, 255), true },
+    { "name", Color3.fromRGB(255, 255, 255), true },
+    { "health bar", Color3.fromRGB(120, 220, 110), true },
+    { "distance", Color3.fromRGB(255, 255, 255), false },
+    { "weapon", Color3.fromRGB(255, 255, 255), false },
+    { "skeleton", Color3.fromRGB(255, 255, 255), false },
+}
 local Players = Esp:Section({ Name = "players", Side = "left" })
-for _, name in { "box", "name", "health bar", "distance", "weapon", "skeleton" } do
-    local toggle = Players:Toggle({ Name = name, Flag = "esp_" .. string.gsub(name, " ", "_") })
-    toggle:Colorpicker({ Flag = "esp_" .. string.gsub(name, " ", "_") .. "_color", Default = Color3.fromRGB(255, 255, 255) })
+for _, element in EspElements do
+    local flag = "esp_" .. string.gsub(element[1], " ", "_")
+    local toggle = Players:Toggle({ Name = element[1], Flag = flag, Default = element[3] })
+    toggle:Colorpicker({ Flag = flag .. "_color", Default = element[2] })
 end
 
 local World = Visuals:Section({ Name = "world", Side = "left" })
@@ -105,7 +125,15 @@ local Watermark = Library:Watermark({
 local Keybinds = Library:KeybindList({ Name = "keybinds", Mode = "All" })
 local Hitlogs = Library:Hitlogs({ Side = "Left", Animation = "Slide" })
 local Target = Library:TargetHud({ Mode = "Static" })
-local Preview = Library:EspPreview({ Name = "esp preview", Text = "no preview for ya today" })
+Library:Notifications({ Position = "BottomRight" })
+
+-- the preview shows your own character; drag it to turn it around
+local Preview = Library:EspPreview({ Name = "esp preview" })
+for _, element in EspElements do
+    local flag = "esp_" .. string.gsub(element[1], " ", "_")
+    Preview:Link(element[1], flag, flag .. "_color")
+end
+
 local Configs = Library:Configs()
 local Lua = Library:Lua()
 local Dock = Library:Dock({ Name = "rainworld.club", Mode = "Top" })
@@ -123,14 +151,14 @@ Dock:Add("target", Target)
 
 --// Wiring ----------------------------------------------------------------------
 
-local Settings = Misc:Section({ Name = "demo", Side = "left" })
-Settings:Button({
+local Demo = Misc:Section({ Name = "demo", Side = "left" })
+Demo:Button({
     Name = "test hitlog",
     Callback = function()
         Hitlogs:Add({ "hit ", { "cursedbullet" }, " in the ", { "head" }, " for ", { "100", Color3.fromRGB(120, 220, 110) } })
     end,
 })
-Settings:DoubleButton({
+Demo:DoubleButton({
     Name = "target me",
     Callback = function()
         Target:SetTarget(game:GetService("Players").LocalPlayer)
@@ -141,7 +169,24 @@ Settings:DoubleButton({
         Target:SetTarget(nil)
     end,
 })
-Settings:Button({
+Demo:Button({
+    Name = "notify",
+    Callback = function()
+        Library:Notify({
+            Title = "update available",
+            Text = { "version ", { "1.1" }, " is out. hover a notification to keep it open." },
+            Type = "warning",
+            Duration = 8,
+            Buttons = {
+                { Name = "install", Callback = function()
+                    Library:Notify({ Title = "update", Text = "installed", Type = "success" })
+                end },
+                { Name = "later" },
+            },
+        })
+    end,
+})
+Demo:Button({
     Name = "unload",
     Callback = function()
         Library:Unload()
@@ -155,6 +200,14 @@ end)
 AimKey.Changed:Connect(function(active)
     print("aim key", active and "held" or "released")
 end)
+-- AimParts:GetParts(character) returns the matching parts of any R6 or R15 character
+AimParts.Changed:Connect(function(parts)
+    print("trigger parts:", table.concat(parts, ", "))
+end)
 
 Library:LoadAutoload()
-Library:Notify({ "loaded ", { Library.Name }, " - press ", { "right shift" }, " to toggle the menu" })
+Library:Notify({
+    Title = Library.Name,
+    Text = { "loaded - press ", { "right shift" }, " to open and close the menu" },
+    Type = "success",
+})
